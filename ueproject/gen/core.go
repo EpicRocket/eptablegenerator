@@ -4,20 +4,23 @@ import (
 	"eptablegenerator/table/config"
 	"eptablegenerator/table/xlsx"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
 type sheetType interface {
 	GetSheetName() string
-	Generate() (string, []string, error)
+	Generate() (string, []string, []string, error)
 }
 
 type defaultSheetType struct {
-	SheetName string
-	Data      *[][]string
+	ProjectName string
+	SheetName   string
+	Data        *[][]string
 }
 
 func (d *defaultSheetType) GetSheetName() string {
@@ -28,28 +31,172 @@ type structType struct {
 	defaultSheetType
 }
 
-func (s *structType) Generate() (string, []string, error) {
+func (s *structType) Generate() (string, []string, []string, error) {
 	var content string
 	forwardContent := []string{}
+	include := []string{}
 
-	return content, forwardContent, nil
+	if len(*s.Data) < 2 {
+		return content, forwardContent, include, errors.New("data is not enough")
+	}
+
+	// NOTE. 첫번 째 헤더 이름, 두번 째 값 타입
+	header := (*s.Data)[0]
+	types := (*s.Data)[1]
+
+	if len(header) != len(types) {
+		return content, forwardContent, include, errors.New("header and types are not matched")
+	}
+
+	variables := []string{}
+	for _, v := range types {
+		switch {
+		case v == "bool":
+			variables = append(variables, "bool")
+
+		case v == "int32":
+			variables = append(variables, "int32")
+
+		case v == "int64":
+			variables = append(variables, "int64")
+
+		case v == "float32":
+			variables = append(variables, "float")
+
+		case v == "float64":
+			variables = append(variables, "double")
+
+		case v == "FString":
+			variables = append(variables, "FString")
+
+		case v == "FText":
+			variables = append(variables, "FText")
+
+		case strings.HasPrefix(v, "TArray<") && strings.HasSuffix(v, ">"):
+			variables = append(variables, "TArray<"+v[7:len(v)-1]+">")
+
+		case strings.HasPrefix(v, "TMap<") && strings.HasSuffix(v, ">"):
+			variables = append(variables, "TMap<"+v[5:len(v)-1]+">")
+
+		case strings.HasPrefix(v, "TSet<") && strings.HasSuffix(v, ">"):
+			variables = append(variables, "TSet<"+v[5:len(v)-1]+">")
+
+		case strings.HasPrefix(v, "Enum<") && strings.HasSuffix(v, ">"):
+			variables = append(variables, v[5:len(v)-1])
+			forwardContent = append(forwardContent, "enum class "+v[5:len(v)-1]+" : uint8")
+
+		case strings.HasPrefix(v, "Class<") && strings.HasSuffix(v, ">"):
+			variables = append(variables, "TSoftClassPtr<"+v[6:len(v)-1]+">")
+			forwardContent = append(forwardContent, "class "+v[6:len(v)-1])
+
+		case strings.HasPrefix(v, "Asset<") && strings.HasSuffix(v, ">"):
+			variables = append(variables, "TSoftObjectPtr<"+v[6:len(v)-1]+">")
+			forwardContent = append(forwardContent, "class "+v[6:len(v)-1])
+
+		default:
+			variables = append(variables, "")
+		}
+	}
+
+	include = append(include, "Engine/DataTable.h")
+
+	projectName := strings.ToUpper(s.ProjectName)
+	if projectName != "" {
+		projectName = fmt.Sprintf("%s_API ", projectName)
+	}
+
+	content += "USTRUCT(BlueprintType)\n"
+	content += fmt.Sprintf("struct %sF%s : public FTableRowBase\n", projectName, s.SheetName)
+	content += "{\n"
+	content += "\tGENERATED_BODY()\n"
+	content += "\n"
+
+	duplicate := map[string]any{}
+	for i, name := range header {
+		v := variables[i]
+		if v == "" || name == "" {
+			continue
+		}
+
+		if _, ok := duplicate[name]; ok {
+			continue
+		}
+		duplicate[name] = nil
+
+		content += "\tUPROPERTY(EditAnywhere, BlueprintReadWrite)\n"
+		content += fmt.Sprintf("\t%s %s;\n", v, name)
+		content += "\n"
+	}
+
+	content += "}\n"
+	content += "\n"
+
+	return content, forwardContent, include, nil
 }
 
 type enumType struct {
 	defaultSheetType
 }
 
-func (e *enumType) Generate() (string, []string, error) {
+func (e *enumType) Generate() (string, []string, []string, error) {
 	var content string
 	forwardContent := []string{}
+	include := []string{}
 
-	return content, forwardContent, nil
+	if len(*e.Data) < 2 {
+		return content, forwardContent, include, errors.New("data is not enough")
+	}
+
+	values := []string{}
+	for _, data := range (*e.Data)[2:] {
+		if len(data) < 2 {
+			continue
+		}
+
+		value, err := strconv.Atoi(data[0])
+		name := data[1]
+
+		var displayName string
+		if len(data) >= 3 {
+			displayName = data[2]
+		}
+
+		if err != nil {
+			println("value is not int: " + e.SheetName)
+			continue
+		}
+
+		if name == "" {
+			println("name is empty: " + e.SheetName)
+			continue
+		}
+
+		r := fmt.Sprintf("\t%s = %d", name, value)
+		if displayName != "" {
+			r += fmt.Sprintf(" UMETA(DisplayName = \"%s\")", displayName)
+		}
+
+		values = append(values, r)
+	}
+
+	include = append(include, "Misc/EnumRange.h")
+
+	content += "UENUM(BlueprintType)\n"
+	content += fmt.Sprintf("enum class %s : uint8", e.SheetName)
+	content += "{\n"
+
+	for _, v := range values {
+		content += v + ",\n"
+	}
+
+	content += "\tMax UMETA(Hidden)\n"
+	content += "}\n"
+	content += "\n"
+	content += fmt.Sprintf("ENUM_RANGE_BY_COUNT(%s, %s::Max)\n", e.SheetName, e.SheetName)
+	content += "\n"
+
+	return content, forwardContent, include, nil
 }
-
-// type headerType struct {
-// 	Name string
-// 	Type string
-// }
 
 func GenerateUE(c *config.Config) error {
 	if c == nil {
@@ -79,16 +226,20 @@ func GenerateUE(c *config.Config) error {
 		fileName := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 		for sheetName, data := range x.Data {
 			if strings.HasPrefix(sheetName, "!") {
+				// NOTE. 첫번 째 헤더 이름, 두번 째 값 타입
+				sliceData := data[:2]
 				st := &structType{defaultSheetType{
-					SheetName: sheetName[1:],
-					Data:      &data,
+					ProjectName: c.ProjectName,
+					SheetName:   sheetName[1:],
+					Data:        &sliceData,
 				}}
 				m[fileName] = append(m[fileName], st)
 
 			} else if strings.HasPrefix(sheetName, "@") {
 				et := &enumType{defaultSheetType{
-					SheetName: sheetName[1:],
-					Data:      &data,
+					ProjectName: c.ProjectName,
+					SheetName:   sheetName[1:],
+					Data:        &data,
 				}}
 				m[fileName] = append(m[fileName], et)
 			}
@@ -104,8 +255,10 @@ func GenerateUE(c *config.Config) error {
 	}
 
 	errs := []error{}
+	docs := map[string]string{}
 	for fileName, sheets := range m {
 		var preContent string
+		include := map[string]any{}
 		forwardContent := map[string]any{}
 		var content string
 
@@ -118,12 +271,15 @@ func GenerateUE(c *config.Config) error {
 
 		sheetErrs := []error{}
 		for _, sheet := range sheets {
-			c, p, err := sheet.Generate()
+			c, p, i, err := sheet.Generate()
 			if err != nil {
 				sheetErrs = append(sheetErrs, err)
 				break
 			}
 			content += c
+			for _, v := range i {
+				include[v] = nil
+			}
 			for _, v := range p {
 				forwardContent[v] = nil
 			}
@@ -133,33 +289,45 @@ func GenerateUE(c *config.Config) error {
 			break
 		}
 
-		path := filepath.Join(c.DestDir, fileName+".h")
-		h, err := os.Create(path)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
 		var result string
 		result += preContent
 		result += "\n"
+		for key := range include {
+			result += fmt.Sprintf("#include \"%s\"\n", key)
+		}
+		result += fmt.Sprintf("#include \"%s.generated.h\"\n", fileName)
+
 		for key := range forwardContent {
 			result += key + ";\n"
 		}
 		result += "\n"
 		result += content
 
-		if _, err := h.WriteString(result); err != nil {
-			errs = append(errs, err)
-			h.Close()
-			continue
-		}
-		h.Close()
+		docs[fileName] = result
+
 	}
 
 	var r error
 	for _, err := range errs {
 		r = errors.Join(r, err)
+	}
+
+	if r == nil {
+		for fileName, doc := range docs {
+			path := filepath.Join(c.DestDir, fileName+".h")
+			h, err := os.Create(path)
+			if err != nil {
+				r = errors.Join(r, err)
+				continue
+			}
+
+			if _, err := h.WriteString(doc); err != nil {
+				errs = append(errs, err)
+				h.Close()
+				continue
+			}
+			h.Close()
+		}
 	}
 
 	return r

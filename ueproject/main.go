@@ -15,8 +15,6 @@ func main() {
 		c = *config.NewConfig()
 	}
 
-	c.SourceDir = "../../SProject/XLSX"
-
 	if err := gen.GenerateUE(&c); err != nil {
 		panic(err)
 	}
