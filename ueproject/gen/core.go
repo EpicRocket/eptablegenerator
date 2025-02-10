@@ -200,7 +200,6 @@ func (e *enumType) Generate() (string, []string, []string, error) {
 
 	content += "\tMax UMETA(Hidden)\n"
 	content += "}\n"
-	content += "\n"
 	content += fmt.Sprintf("ENUM_RANGE_BY_COUNT(%s, %s::Max)\n", e.SheetName, e.SheetName)
 	content += "\n"
 
