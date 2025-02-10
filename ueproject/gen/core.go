@@ -48,53 +48,58 @@ func (s *structType) Generate() (string, []string, []string, error) {
 		return content, forwardContent, include, errors.New("header and types are not matched")
 	}
 
-	variables := []string{}
+	type VariableType struct {
+		Type    string
+		Default string
+	}
+
+	variables := []VariableType{}
 	for _, v := range types {
 		switch {
 		case v == "bool":
-			variables = append(variables, "bool")
+			variables = append(variables, VariableType{"bool", "false"})
 
 		case v == "int32":
-			variables = append(variables, "int32")
+			variables = append(variables, VariableType{"int32", "INDEX_NONE"})
 
 		case v == "int64":
-			variables = append(variables, "int64")
+			variables = append(variables, VariableType{"int64", "INDEX_NONE"})
 
 		case v == "float32":
-			variables = append(variables, "float")
+			variables = append(variables, VariableType{"float", "INDEX_NONE"})
 
 		case v == "float64":
-			variables = append(variables, "double")
+			variables = append(variables, VariableType{"double", "INDEX_NONE"})
 
 		case v == "FString":
-			variables = append(variables, "FString")
+			variables = append(variables, VariableType{"FString", ""})
 
 		case v == "FText":
-			variables = append(variables, "FText")
+			variables = append(variables, VariableType{"FText", ""})
 
 		case strings.HasPrefix(v, "TArray<") && strings.HasSuffix(v, ">"):
-			variables = append(variables, "TArray<"+v[7:len(v)-1]+">")
+			variables = append(variables, VariableType{"TArray<" + v[7:len(v)-1] + ">", ""})
 
 		case strings.HasPrefix(v, "TMap<") && strings.HasSuffix(v, ">"):
-			variables = append(variables, "TMap<"+v[5:len(v)-1]+">")
+			variables = append(variables, VariableType{"TMap<" + v[5:len(v)-1] + ">", ""})
 
 		case strings.HasPrefix(v, "TSet<") && strings.HasSuffix(v, ">"):
-			variables = append(variables, "TSet<"+v[5:len(v)-1]+">")
+			variables = append(variables, VariableType{"TSet<" + v[5:len(v)-1] + ">", ""})
 
 		case strings.HasPrefix(v, "Enum<") && strings.HasSuffix(v, ">"):
-			variables = append(variables, v[5:len(v)-1])
+			variables = append(variables, VariableType{v[5 : len(v)-1], "static_cast<" + v[5:len(v)-1] + ">(0)"})
 			forwardContent = append(forwardContent, "enum class "+v[5:len(v)-1]+" : uint8")
 
 		case strings.HasPrefix(v, "Class<") && strings.HasSuffix(v, ">"):
-			variables = append(variables, "TSoftClassPtr<"+v[6:len(v)-1]+">")
+			variables = append(variables, VariableType{"TSoftClassPtr<" + v[6:len(v)-1] + ">", ""})
 			forwardContent = append(forwardContent, "class "+v[6:len(v)-1])
 
 		case strings.HasPrefix(v, "Asset<") && strings.HasSuffix(v, ">"):
-			variables = append(variables, "TSoftObjectPtr<"+v[6:len(v)-1]+">")
+			variables = append(variables, VariableType{"TSoftObjectPtr<" + v[6:len(v)-1] + ">", ""})
 			forwardContent = append(forwardContent, "class "+v[6:len(v)-1])
 
 		default:
-			variables = append(variables, "")
+			variables = append(variables, VariableType{})
 		}
 	}
 
@@ -114,7 +119,7 @@ func (s *structType) Generate() (string, []string, []string, error) {
 	duplicate := map[string]any{}
 	for i, name := range header {
 		v := variables[i]
-		if v == "" || name == "" {
+		if v.Type == "" || name == "" {
 			continue
 		}
 
@@ -124,7 +129,11 @@ func (s *structType) Generate() (string, []string, []string, error) {
 		duplicate[name] = nil
 
 		content += "\tUPROPERTY(EditAnywhere, BlueprintReadWrite)\n"
-		content += fmt.Sprintf("\t%s %s;\n", v, name)
+		if v.Default == "" {
+			content += fmt.Sprintf("\t%s %s;\n", v.Type, name)
+		} else {
+			content += fmt.Sprintf("\t%s %s = %s;\n", v.Type, name, v.Default)
+		}
 		content += "\n"
 	}
 
@@ -198,6 +207,106 @@ func (e *enumType) Generate() (string, []string, []string, error) {
 	return content, forwardContent, include, nil
 }
 
+type ConstType struct {
+	defaultSheetType
+}
+
+func (c *ConstType) Generate() (string, []string, []string, error) {
+	var content string
+	forwardContent := []string{}
+	include := []string{}
+
+	include = append(include, "Engine/DeveloperSettings.h")
+
+	configName := c.ProjectName
+	if configName == "" {
+		configName = "Game"
+	}
+
+	projectName := strings.ToUpper(c.ProjectName)
+	if projectName != "" {
+		projectName = fmt.Sprintf("%s_API ", projectName)
+	}
+
+	content += fmt.Sprintf("UCLASS(config = %s, defaultconfig)\n", configName)
+	content += fmt.Sprintf("class %sU%s : public UDeveloperSettings\n", projectName, c.SheetName)
+	content += "{\n"
+	content += "\tGENERATED_BODY()\n"
+	content += "\n"
+	content += "public:\n"
+
+	for _, data := range (*c.Data)[1:] {
+		if len(data) < 3 {
+			continue
+		}
+
+		n := data[0]
+		t := data[1]
+
+		if n == "" || t == "" {
+			println("name or type is empty: " + c.SheetName)
+			continue
+		}
+
+		r := "\tUPROPERTY(Config, VisibleDefaultsOnly, BlueprintReadOnly, Category = \"Table\")\n"
+
+		switch {
+		case t == "bool":
+			r += fmt.Sprintf("\tbool %s;\n", n)
+
+		case t == "int32":
+			r += fmt.Sprintf("\tint32 %s;\n", n)
+
+		case t == "int64":
+			r += fmt.Sprintf("\tint64 %s;\n", n)
+
+		case t == "float32":
+			r += fmt.Sprintf("\tfloat %s;\n", n)
+
+		case t == "float64":
+			r += fmt.Sprintf("\tdouble %s;\n", n)
+
+		case t == "FString":
+			r += fmt.Sprintf("\tFString %s;\n", n)
+
+		case t == "FText":
+			r += fmt.Sprintf("\tFText %s;\n", n)
+
+		case strings.HasPrefix(t, "TArray<") && strings.HasSuffix(t, ">"):
+			r += fmt.Sprintf("\tTArray<%s> %s;\n", t[7:len(t)-1], n)
+
+		case strings.HasPrefix(t, "TMap<") && strings.HasSuffix(t, ">"):
+			r += fmt.Sprintf("\tTMap<%s> %s;\n", t[5:len(t)-1], n)
+
+		case strings.HasPrefix(t, "TSet<") && strings.HasSuffix(t, ">"):
+			r += fmt.Sprintf("\tTSet<%s> %s;\n", t[5:len(t)-1], n)
+
+		case strings.HasPrefix(t, "Enum<") && strings.HasSuffix(t, ">"):
+			r += fmt.Sprintf("\t%s %s;\n", t[5:len(t)-1], n)
+			forwardContent = append(forwardContent, "enum class "+t[5:len(t)-1]+" : uint8")
+
+		case strings.HasPrefix(t, "Class<") && strings.HasSuffix(t, ">"):
+			r += fmt.Sprintf("\tTSoftClassPtr<%s> %s;\n", t[6:len(t)-1], n)
+			forwardContent = append(forwardContent, "class "+t[6:len(t)-1])
+
+		case strings.HasPrefix(t, "Asset<") && strings.HasSuffix(t, ">"):
+			r += fmt.Sprintf("\tTSoftObjectPtr<%s> %s;\n", t[6:len(t)-1], n)
+			forwardContent = append(forwardContent, "class "+t[6:len(t)-1])
+
+		default:
+			continue
+		}
+
+		content += r
+		content += "\n"
+	}
+
+	content += "}\n"
+	content += "\n"
+
+	return content, forwardContent, include, nil
+}
+
 func GenerateUE(c *config.Config) error {
 	if c == nil {
 		return errors.New("config is nil")
@@ -225,7 +334,10 @@ func GenerateUE(c *config.Config) error {
 		x := xlsx.NewXLSX(file)
 		fileName := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 		for sheetName, data := range x.Data {
-			if strings.HasPrefix(sheetName, "!") {
+			switch {
+
+			// 구조체 타입
+			case strings.HasPrefix(sheetName, "!"):
 				// NOTE. 첫번 째 헤더 이름, 두번 째 값 타입
 				sliceData := data[:2]
 				st := &structType{defaultSheetType{
@@ -235,13 +347,23 @@ func GenerateUE(c *config.Config) error {
 				}}
 				m[fileName] = append(m[fileName], st)
 
-			} else if strings.HasPrefix(sheetName, "@") {
+				// 열거형 타입
+			case strings.HasPrefix(sheetName, "@"):
 				et := &enumType{defaultSheetType{
 					ProjectName: c.ProjectName,
 					SheetName:   sheetName[1:],
 					Data:        &data,
 				}}
 				m[fileName] = append(m[fileName], et)
+
+				// 글로벌 매직 변수 타입
+			case strings.HasPrefix(sheetName, "#"):
+				ct := &ConstType{defaultSheetType{
+					ProjectName: c.ProjectName,
+					SheetName:   sheetName[1:],
+					Data:        &data,
+				}}
+				m[fileName] = append(m[fileName], ct)
 			}
 		}
 	}
@@ -267,7 +389,6 @@ func GenerateUE(c *config.Config) error {
 		preContent += "#pragma once\n"
 		preContent += "\n"
 		preContent += "#include \"CoreMinimal.h\""
-		preContent += "\n"
 
 		sheetErrs := []error{}
 		for _, sheet := range sheets {
@@ -295,7 +416,10 @@ func GenerateUE(c *config.Config) error {
 		for key := range include {
 			result += fmt.Sprintf("#include \"%s\"\n", key)
 		}
+
+		result += "\n"
 		result += fmt.Sprintf("#include \"%s.generated.h\"\n", fileName)
+		result += "\n"
 
 		for key := range forwardContent {
 			result += key + ";\n"
