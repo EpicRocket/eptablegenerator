@@ -7,6 +7,28 @@
 
 	"tasks": {
 		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "build ueproject",
+				"type": "shell",
+				"command": "go",
+				"args": [
+					"build",
+					"-o",
+					"${workspaceFolder}/output/",
+				],
+				"group": {
+					"kind": "build",
+					"isDefault": true
+				},
+				"options": {
+                    "cwd": "${workspaceFolder}/ueproject"
+                },
+				"problemMatcher": [
+					"$go",
+				]
+			}
+		]
 	},
 
 	"launch": {

@@ -14,7 +14,7 @@
 ```markdown
 project_name: (옵션)
 source_dir: 변환할 데이터 파일 디렉토리 경로 (없을 시 실행 경로)
-destDir: 생성할 데이터 파일 디렉토리 경로 (없을 시 실행 경로)
+dest_dir: 생성할 데이터 파일 디렉토리 경로 (없을 시 실행 경로)
 ```
 
 ## 📄 package ueproject

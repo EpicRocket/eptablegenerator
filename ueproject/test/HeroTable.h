@@ -11,6 +11,49 @@ enum class EAttackType : uint8;
 class UTexturte2D;
 
 USTRUCT(BlueprintType)
+struct TEST_API FHeroSkill : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Index = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Kind = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Level = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Name = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Attack = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Defend = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Hp = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 AttackSpeed = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Range = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 ReactionRange = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Splash = INDEX_NONE;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 SplashRange = INDEX_NONE;
+
+}
+
+USTRUCT(BlueprintType)
 struct TEST_API FHero : public FTableRowBase
 {
 	GENERATED_BODY()
@@ -62,49 +105,6 @@ struct TEST_API FHero : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString HeroDesc;
-
-}
-
-USTRUCT(BlueprintType)
-struct TEST_API FHeroSkill : public FTableRowBase
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Index = INDEX_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Kind = INDEX_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Level = INDEX_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Name = INDEX_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Attack = INDEX_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Defend = INDEX_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Hp = INDEX_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 AttackSpeed = INDEX_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Range = INDEX_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 ReactionRange = INDEX_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Splash = INDEX_NONE;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 SplashRange = INDEX_NONE;
 
 }
 
