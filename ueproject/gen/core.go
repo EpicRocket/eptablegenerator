@@ -137,7 +137,7 @@ func (s *structType) Generate() (string, []string, []string, error) {
 		content += "\n"
 	}
 
-	content += "}\n"
+	content += "};\n"
 	content += "\n"
 
 	return content, forwardContent, include, nil
@@ -199,7 +199,7 @@ func (e *enumType) Generate() (string, []string, []string, error) {
 	}
 
 	content += "\tMax UMETA(Hidden)\n"
-	content += "}\n"
+	content += "};\n"
 	content += fmt.Sprintf("ENUM_RANGE_BY_COUNT(%s, %s::Max)\n", e.SheetName, e.SheetName)
 	content += "\n"
 
@@ -300,7 +300,7 @@ func (c *ConstType) Generate() (string, []string, []string, error) {
 		content += "\n"
 	}
 
-	content += "}\n"
+	content += "};\n"
 	content += "\n"
 
 	return content, forwardContent, include, nil
