@@ -111,7 +111,7 @@ func (s *structType) Generate() (string, []string, []string, error) {
 	}
 
 	content += "USTRUCT(BlueprintType)\n"
-	content += fmt.Sprintf("struct %sF%s : public FTableRowBase\n", projectName, s.SheetName)
+	content += fmt.Sprintf("struct %sF%sTableRow : public FTableRowBase\n", projectName, s.SheetName)
 	content += "{\n"
 	content += "\tGENERATED_BODY()\n"
 	content += "\n"
@@ -228,7 +228,7 @@ func (c *ConstType) Generate() (string, []string, []string, error) {
 	}
 
 	content += fmt.Sprintf("UCLASS(config = %s, defaultconfig)\n", configName)
-	content += fmt.Sprintf("class %sU%s : public UDeveloperSettings\n", projectName, c.SheetName)
+	content += fmt.Sprintf("class %sU%sSettings : public UDeveloperSettings\n", projectName, c.SheetName)
 	content += "{\n"
 	content += "\tGENERATED_BODY()\n"
 	content += "\n"
