@@ -420,9 +420,16 @@ func GenerateUE(c *config.Config) error {
 		result += fmt.Sprintf("#include \"%s.generated.h\"\n", fileName)
 		result += "\n"
 
+		forwardContentArr := []string{}
 		for key := range forwardContent {
-			result += key + ";\n"
+			forwardContentArr = append(forwardContentArr, key)
 		}
+
+		sort.Strings(forwardContentArr)
+		for _, v := range forwardContentArr {
+			result += v + ";\n"
+		}
+
 		result += "\n"
 		result += content
 
