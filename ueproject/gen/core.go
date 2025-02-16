@@ -367,17 +367,36 @@ func GenerateUE(c *config.Config) error {
 		}
 	}
 
+	type GenerateData struct {
+		FileName string
+		Sheets   []sheetType
+	}
+	g := []GenerateData{}
+
 	for key := range m {
 		sort.Slice(m[key], func(i, j int) bool {
-			_, isEnumi := m[key][i].(*enumType)
-			_, isEnumj := m[key][j].(*enumType)
-			return isEnumi && !isEnumj
+			_, isEnumI := m[key][i].(*enumType)
+			_, isEnumJ := m[key][j].(*enumType)
+
+			if isEnumI != isEnumJ {
+				return isEnumI && !isEnumJ
+			}
+
+			strI := fmt.Sprintf("%v", m[key][i])
+			strJ := fmt.Sprintf("%v", m[key][j])
+
+			return strI < strJ
+		})
+
+		g = append(g, GenerateData{
+			FileName: key,
+			Sheets:   m[key],
 		})
 	}
 
 	errs := []error{}
 	docs := map[string]string{}
-	for fileName, sheets := range m {
+	for _, d := range g {
 		var preContent string
 		include := map[string]any{}
 		forwardContent := map[string]any{}
@@ -390,7 +409,7 @@ func GenerateUE(c *config.Config) error {
 		preContent += "#include \"CoreMinimal.h\""
 
 		sheetErrs := []error{}
-		for _, sheet := range sheets {
+		for _, sheet := range d.Sheets {
 			c, p, i, err := sheet.Generate()
 			if err != nil {
 				sheetErrs = append(sheetErrs, err)
@@ -417,7 +436,7 @@ func GenerateUE(c *config.Config) error {
 		}
 
 		result += "\n"
-		result += fmt.Sprintf("#include \"%s.generated.h\"\n", fileName)
+		result += fmt.Sprintf("#include \"%s.generated.h\"\n", d.FileName)
 		result += "\n"
 
 		forwardContentArr := []string{}
@@ -433,7 +452,7 @@ func GenerateUE(c *config.Config) error {
 		result += "\n"
 		result += content
 
-		docs[fileName] = result
+		docs[d.FileName] = result
 
 	}
 
