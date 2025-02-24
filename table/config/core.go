@@ -9,9 +9,10 @@ import (
 )
 
 type Config struct {
-	ProjectName string `yaml:"project_name"`
-	SourceDir   string `yaml:"source_dir"`
-	DestDir     string `yaml:"dest_dir"`
+	ProjectName   string   `yaml:"project_name"`
+	SourceDir     string   `yaml:"source_dir"`
+	DestDir       string   `yaml:"dest_dir"`
+	OptionalFiles []string `yaml:"optional_files"`
 }
 
 func NewConfig() *Config {

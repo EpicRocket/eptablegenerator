@@ -10,22 +10,28 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"gopkg.in/ini.v1"
 )
 
 type sheetType interface {
 	GetSheetName() string
 	Generate() (string, []string, []string, error)
+	Optional()
 }
 
 type defaultSheetType struct {
-	ProjectName string
-	SheetName   string
-	Data        *[][]string
+	ProjectName   string
+	SheetName     string
+	Data          *[][]string
+	OptionalFiles []string
 }
 
 func (d *defaultSheetType) GetSheetName() string {
 	return d.SheetName
 }
+
+func (d *defaultSheetType) Optional() {}
 
 type structType struct {
 	defaultSheetType
@@ -247,7 +253,7 @@ func (c *ConstType) Generate() (string, []string, []string, error) {
 			continue
 		}
 
-		r := "\tUPROPERTY(Config, VisibleDefaultsOnly, BlueprintReadOnly, Category = \"Table\")\n"
+		r := "\tUPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = \"Table\")\n"
 
 		switch {
 		case t == "bool":
@@ -306,6 +312,40 @@ func (c *ConstType) Generate() (string, []string, []string, error) {
 	return content, forwardContent, include, nil
 }
 
+func (c *ConstType) Optional() {
+	conifgFileName := "Default" + c.ProjectName + ".ini"
+	var cfgPath string
+	var cfg *ini.File
+	var err error
+
+	for _, v := range c.OptionalFiles {
+		if strings.Contains(v, conifgFileName) {
+			cfg, err = ini.Load(v)
+			cfgPath = v
+			break
+		}
+	}
+
+	if cfg == nil || err != nil {
+		return
+	}
+
+	section := "/Script/" + c.ProjectName + "." + c.SheetName + "Settings"
+
+	for _, data := range (*c.Data)[1:] {
+		if len(data) < 3 {
+			continue
+		}
+
+		n := data[0]
+		v := data[2]
+
+		cfg.Section(section).Key(n).SetValue(v)
+	}
+
+	cfg.SaveTo(cfgPath)
+}
+
 func GenerateUE(c *config.Config) error {
 	if c == nil {
 		return errors.New("config is nil")
@@ -340,27 +380,30 @@ func GenerateUE(c *config.Config) error {
 				// NOTE. 첫번 째 헤더 이름, 두번 째 값 타입
 				sliceData := data[:2]
 				st := &structType{defaultSheetType{
-					ProjectName: c.ProjectName,
-					SheetName:   sheetName[1:],
-					Data:        &sliceData,
+					ProjectName:   c.ProjectName,
+					SheetName:     sheetName[1:],
+					Data:          &sliceData,
+					OptionalFiles: c.OptionalFiles,
 				}}
 				m[fileName] = append(m[fileName], st)
 
 				// 열거형 타입
 			case strings.HasPrefix(sheetName, "@"):
 				et := &enumType{defaultSheetType{
-					ProjectName: c.ProjectName,
-					SheetName:   sheetName[1:],
-					Data:        &data,
+					ProjectName:   c.ProjectName,
+					SheetName:     sheetName[1:],
+					Data:          &data,
+					OptionalFiles: c.OptionalFiles,
 				}}
 				m[fileName] = append(m[fileName], et)
 
 				// 글로벌 매직 변수 타입
 			case strings.HasPrefix(sheetName, "#"):
 				ct := &ConstType{defaultSheetType{
-					ProjectName: c.ProjectName,
-					SheetName:   sheetName[1:],
-					Data:        &data,
+					ProjectName:   c.ProjectName,
+					SheetName:     sheetName[1:],
+					Data:          &data,
+					OptionalFiles: c.OptionalFiles,
 				}}
 				m[fileName] = append(m[fileName], ct)
 			}
@@ -476,6 +519,13 @@ func GenerateUE(c *config.Config) error {
 				continue
 			}
 			h.Close()
+		}
+	}
+
+	// 추가 옵션
+	for _, d := range g {
+		for _, sheet := range d.Sheets {
+			sheet.Optional()
 		}
 	}
 
