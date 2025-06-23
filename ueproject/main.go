@@ -16,6 +16,7 @@ func main() {
 	}
 
 	if err := gen.GenerateUE(&c); err != nil {
+		println("Error generating UE project:", err)
 		panic(err)
 	}
 }

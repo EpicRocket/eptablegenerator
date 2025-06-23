@@ -50,10 +50,6 @@ func (s *structType) Generate() (string, []string, []string, error) {
 	header := (*s.Data)[0]
 	types := (*s.Data)[1]
 
-	if len(header) != len(types) {
-		return content, forwardContent, include, errors.New("header and types are not matched")
-	}
-
 	type VariableType struct {
 		Type    string
 		Default string
@@ -123,7 +119,13 @@ func (s *structType) Generate() (string, []string, []string, error) {
 	content += "\n"
 
 	duplicate := map[string]any{}
+
+	varCount := len(variables)
 	for i, name := range header {
+		if i >= varCount {
+			break
+		}
+
 		v := variables[i]
 		if v.Type == "" || name == "" {
 			continue
